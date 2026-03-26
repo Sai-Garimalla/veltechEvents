@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Events Dashboard | VEL TECH</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/events" class="logo">VEL TECH<span>Events</span></a>
+        
+        <div class="nav-links">
+            <a href="/events/my-tickets" style="color: var(--accent);">My Tickets</a>
+            <a sec:authorize="hasRole('ADMIN')" href="/admin/manage-events" style="color: var(--accent);">Admin Panel</a>
+            <span sec:authentication="name" style="color: var(--primary); font-weight: 600;"></span>
+            <form th:action="@{/logout}" method="post" style="display: inline;">
+                <button type="submit" class="btn-profile">Logout</button>
+            </form>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <h1>Discover Campus Events</h1>
+        <p>Expand your horizons. Register for workshops, tech talks, and cultural fests happening at VEL TECH.</p>
+    </header>
+
+    <main class="container">
+        <h2 class="section-title">Upcoming Events</h2>
+        
+        <div th:if="${param.success}" class="alert alert-success">
+            🎉 Successfully registered! You are on the list.
+        </div>
+
+        <div class="event-grid">
+            
+            <div th:if="${#lists.isEmpty(events)}" class="card" style="grid-column: 1 / -1; text-align: center; padding: 4rem; border-top: none;">
+                <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: #000;">No upcoming events right now.</h3>
+                <p sec:authorize="hasRole('ADMIN')" style="color: #000;">Head over to the Admin Panel to create your first event!</p>
+            </div>
+
+            <article class="event-card" th:each="event : ${events}">
+                <div class="event-image" th:if="${event.imageUrl != null and !event.imageUrl.isEmpty()}" th:style="'background-image: url(' + ${event.imageUrl} + ');'"></div>
+                <div class="event-image" th:unless="${event.imageUrl != null and !event.imageUrl.isEmpty()}"></div>
+                
+                <div class="event-content">
+                    <span class="event-date" th:text="${#temporals.format(event.eventDate, 'MMM dd, yyyy • hh:mm a')}">Date</span>
+                    <h3 class="event-title" th:text="${event.title}">Event Title</h3>
+                    <div class="event-location" th:text="'📍 ' + ${event.location}">Location</div>
+                    
+                    <a th:href="@{/events/register/{id}(id=${event.id})}" class="btn-register">Register</a>
+                </div>
+            </article>
+
+        </div>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Admin Dashboard | VEL TECH Events</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        /* Small styling fix for the camera UI */
+        #qr-reader { width: 100%; max-width: 500px; margin: 0 auto 1.5rem auto; border-radius: 8px; border: 2px solid #10b981; overflow: hidden; background: #fff; color: #000; }
+        #qr-reader button { background: #1e293b; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; margin: 0.5rem; cursor: pointer; }
+        #qr-reader button:hover { background: #0f172a; }
+        #qr-reader select { padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 0.5rem; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <div class="header">
+            <h1 style="margin: 0; font-size: 1.8rem;">VEL TECH <span style="font-weight: 300;">Admin</span></h1>
+            <a href="/events" class="nav-link">&larr; Back to Student Dashboard</a>
+        </div>
+
+        <div th:if="${param.added}" class="alert alert-success" style="text-align: left;">✅ Action successfully completed!</div>
+        <div th:if="${param.success != null and param.success[0] == 'checked_in'}" class="alert alert-success" style="text-align: left;">
+            ✅ Student successfully checked in! (Ticket: <span th:text="${param.ticket}"></span>)
+        </div>
+        <div th:if="${param.error != null and param.error[0] == 'invalid_ticket'}" class="alert alert-error" style="text-align: left;">
+            ❌ Invalid Ticket ID. Please try again.
+        </div>
+        <div th:if="${param.error != null and param.error[0] == 'waitlisted'}" class="alert alert-error" style="text-align: left;">
+            ⚠️ This student is on the WAITLIST and cannot be checked in yet.
+        </div>
+        <div th:if="${param.error != null and param.error[0] == 'already_checked_in'}" class="alert alert-error" style="text-align: left;">
+            ⚠️ This ticket has ALREADY been checked in!
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('manage')">📋 Manage Events</button>
+            <button class="tab-btn" onclick="switchTab('add')">➕ Add New Event</button>
+            <button class="tab-btn" onclick="switchTab('checkin')" style="background: #10b981; color: white; border-color: #059669;">📷 Live Check-in</button>
+        </div>
+
+        <div id="tab-manage" class="tab-content active">
+            
+            <div th:if="${#lists.isEmpty(events)}" class="card" style="text-align: center; color: var(--muted);">
+                <p>No active events found. Click 'Add New Event' to get started!</p>
+            </div>
+
+            <div th:each="event : ${events}" class="event-item">
+                <div class="event-header">
+                    <div class="event-info">
+                        <h3 th:text="${event.title}">Event Title</h3>
+                        <p th:text="${#temporals.format(event.eventDate, 'MMM dd, yyyy • hh:mm a')} + ' | ' + ${event.location}">Date & Location</p>
+                        <p style="font-size: 0.8rem; margin-top: 0.2rem; color: #10b981; font-weight: bold;">
+                            Capacity: <span th:text="${event.maxCapacity > 0 ? event.maxCapacity : 'Unlimited'}"></span>
+                        </p>
+                    </div>
+                    <div class="event-actions">
+                        <a th:href="@{/admin/export-csv/{id}(id=${event.id})}" class="btn-action" style="background: #10b981; color: white;">📥 Export CSV</a>
+                        <a th:href="@{/admin/edit-event/{id}(id=${event.id})}" class="btn-action btn-edit">Edit</a>
+                        <a th:href="@{/admin/delete-event/{id}(id=${event.id})}" class="btn-action btn-delete" onclick="return confirm('WARNING: This will remove the event from the student dashboard. Are you sure?');">Delete</a>
+                        <button class="btn-action btn-view" th:onclick="'toggleStudents(' + ${event.id} + ')'">Students 🔽</button>
+                    </div>
+                </div>
+
+                <div th:id="'students-' + ${event.id}" class="student-section">
+                    <div class="filter-bar">
+                        <h4 style="margin: 0; color: var(--primary);">Registered Students</h4>
+                        <input type="text" class="search-box" th:onkeyup="'filterTable(' + ${event.id} + ', this.value)'" placeholder="🔍 Search...">
+                    </div>
+
+                    <table th:id="'table-' + ${event.id}">
+                        <thead>
+                            <tr>
+                                <th th:onclick="'sortTable(' + ${event.id} + ', 0)'">Name ↕</th>
+                                <th th:onclick="'sortTable(' + ${event.id} + ', 1)'">Ticket ID ↕</th>
+                                <th>Email</th>
+                                <th th:onclick="'sortTable(' + ${event.id} + ', 3)'">Status ↕</th>
+                                <th th:onclick="'sortTable(' + ${event.id} + ', 4)'">Checked In ↕</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="reg : ${registrations}" th:if="${reg.event.id == event.id}">
+                                <td th:text="${reg.studentName}">Name</td>
+                                <td style="font-family: monospace; font-weight: bold;" th:text="${reg.ticketNumber}">ID</td>
+                                <td th:text="${reg.studentEmail}">Email</td>
+                                
+                                <td>
+                                    <span th:if="${reg.waitlisted}" style="background: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">WAITLIST</span>
+                                    <span th:unless="${reg.waitlisted}" style="background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold;">CONFIRMED</span>
+                                </td>
+                                
+                                <td>
+                                    <span th:if="${reg.checkedIn}" style="color: #10b981; font-weight: bold;">✅ Yes</span>
+                                    <span th:unless="${reg.checkedIn}" style="color: #ef4444; font-weight: bold;">❌ No</span>
+                                </td>
+                                
+                                <td class="action-links">
+                                    <a th:href="@{/admin/delete-registration/{id}(id=${reg.id})}" class="remove-link" onclick="return confirm('Are you sure you want to remove this student?');">Remove</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-add" class="tab-content">
+            <div class="card">
+                <h2>Create a New Event</h2>
+                <form th:action="@{/admin/add-event}" th:object="${newEvent}" method="post" enctype="multipart/form-data">
+                    <label>Event Title</label>
+                    <input type="text" th:field="*{title}" placeholder="e.g., Annual Tech Fest 2026" required />
+                    
+                    <label>Date & Time</label>
+                    <input type="datetime-local" th:field="*{eventDate}" required />
+                    
+                    <label>Location</label>
+                    <input type="text" th:field="*{location}" placeholder="e.g., Main Auditorium" required />
+                    
+                    <label>Maximum Capacity (Leave as 0 for unlimited)</label>
+                    <input type="number" th:field="*{maxCapacity}" min="0" value="0" required />
+                    
+                    <label>Event Poster (Image Upload)</label>
+                    <input type="file" name="imageFile" accept="image/*" required />
+                    
+                    <button type="submit" class="btn-main" style="margin-top: 1rem;">Publish Event</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="tab-checkin" class="tab-content">
+            <div class="card" style="text-align: center; max-width: 600px; margin: 0 auto; border-top: 5px solid #10b981;">
+                <h2 style="color: #000; margin-bottom: 0.5rem;">Ticket Scanner</h2>
+                <p style="color: #666; margin-bottom: 1.5rem; font-size: 0.9rem;">Scan the student's QR Code using your device camera.</p>
+                
+                <div id="qr-reader"></div>
+
+                <div style="margin: 1.5rem 0; color: #aaa; font-weight: bold; font-size: 0.9rem;">— OR TYPE MANUALLY —</div>
+
+                <form id="checkin-form" th:action="@{/admin/check-in}" method="post">
+                    <input type="text" id="ticketNumberInput" name="ticketNumber" placeholder="Enter TICKET ID" required 
+                           style="font-family: monospace; font-size: 2rem; text-align: center; text-transform: uppercase; letter-spacing: 2px; padding: 1.5rem; border: 2px solid #10b981;" 
+                           autocomplete="off" />
+                    <button type="submit" style="background: #10b981; font-size: 1.2rem; padding: 1rem; margin-top: 1rem;">Verify & Check-In</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Camera Scanner Variable
+        let html5QrcodeScanner = null;
+
+        function switchTab(tabId) {
+            // Standard Tab Switching Logic
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            // NEW: Camera Logic - Only turn the camera on when the Check-In tab is open
+            if (tabId === 'checkin') {
+                startCameraScanner();
+            } else if (html5QrcodeScanner) {
+                // Turn off the camera to save battery if they click away to another tab
+                try {
+                    html5QrcodeScanner.clear();
+                    html5QrcodeScanner = null;
+                } catch(e) {}
+            }
+        }
+
+        // NEW: Initializes the Camera and handles the scan event
+        function startCameraScanner() {
+            if (html5QrcodeScanner) return; // Prevent multiple instances
+
+            function onScanSuccess(decodedText, decodedResult) {
+                // 1. Play a beep sound (optional, but good for UX)
+                // 2. Insert the scanned text into the hidden form field
+                document.getElementById('ticketNumberInput').value = decodedText;
+                
+                // 3. Stop the camera
+                html5QrcodeScanner.clear();
+                
+                // 4. Automatically submit the form to the backend
+                document.getElementById('checkin-form').submit();
+            }
+
+            // Set up the scanner with a box UI to guide the user's phone
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader", 
+                { fps: 10, qrbox: {width: 250, height: 250} },
+                /* verbose= */ false);
+                
+            html5QrcodeScanner.render(onScanSuccess);
+        }
+
+        function toggleStudents(eventId) {
+            const section = document.getElementById('students-' + eventId);
+            section.style.display = section.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function filterTable(eventId, query) {
+            const filter = query.toLowerCase();
+            const rows = document.querySelectorAll(`#table-${eventId} tbody tr`);
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
+            });
+        }
+
+        function sortTable(eventId, columnIndex) {
+            const table = document.getElementById(`table-${eventId}`);
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const isAscending = table.getAttribute('data-sort-dir') === 'asc';
+            table.setAttribute('data-sort-dir', isAscending ? 'desc' : 'asc');
+
+            rows.sort((a, b) => {
+                const cellA = a.children[columnIndex].innerText.toLowerCase();
+                const cellB = b.children[columnIndex].innerText.toLowerCase();
+                if (cellA < cellB) return isAscending ? -1 : 1;
+                if (cellA > cellB) return isAscending ? 1 : -1;
+                return 0;
+            });
+            rows.forEach(row => tbody.appendChild(row));
+        }
+    </script>
+</body>
+</html>
